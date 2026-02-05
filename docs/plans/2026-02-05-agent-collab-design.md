@@ -52,7 +52,7 @@
 
 ### 5. 达成一致的判定
 - comments.md 首行写 `[APPROVED]` → 进入执行阶段
-- 其他情况（含 `[CHANGES_REQUIRED]}` 或无标记）→ 继续迭代
+- 其他情况（含 `[CHANGES_REQUIRED]` 或无标记）→ 继续迭代
 - 迭代达到上限 → 提示用户选择：继续 / 停止
 
 ### 6. 持久化策略
@@ -71,13 +71,15 @@
 ## 目录与文件约定
 
 ```
-<project-root>/
-└── .agent-collab/
+<project-root>/          ← Agent 执行目录（cwd）
+└── .agent-collab/       ← 工作流产物目录（workdir）
     ├── state.json        # 工作流状态
     ├── plan.md           # 当前计划
     ├── comments.md       # 审阅意见
     └── log.md            # 执行日志（增量）
 ```
+
+**注意**：`workdir` 仅用于存放工作流产物，Agent 的执行目录（cwd）始终是项目根目录，以确保代码修改和测试在正确位置运行。
 
 ## 一致性判定标记
 
@@ -201,6 +203,7 @@ agent-collab/
 
 **Step 3.3：执行阶段**
 - 逐步执行 plan
+- **每步执行前需用户 `[Enter]` 确认**（最小安全护栏）
 - 每步完成后：测试 → git commit → 更新 log.md
 
 ## 代码量估算
