@@ -19,3 +19,21 @@
 - `tests/test_init.py`：新建，项目初始化测试
 
 **测试结果**：2/2 通过
+
+---
+
+## Step 1.2：配置加载
+
+**日期**：2026-02-05
+
+**完成内容**：
+- 创建 `config.py` 模块，定义配置数据类（RolesConfig, WorkflowConfig, PathsConfig, Config）
+- 实现 `load_config()` 函数，支持从 TOML 文件加载配置
+- 支持部分配置（未指定的字段使用默认值）
+- 添加路径辅助方法（get_workdir, get_plan_path 等）
+
+**主要文件变更**：
+- `src/agent_collab/config.py`：新建，配置加载逻辑
+- `tests/test_config.py`：新建，配置加载测试
+
+**测试结果**：6/6 通过
