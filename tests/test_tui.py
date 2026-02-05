@@ -16,11 +16,15 @@ class TestAgentCollabApp:
         """Test app initialization."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
+            # Create workdir
+            (project_root / ".agent-collab").mkdir()
+
             app = AgentCollabApp(project_root=project_root)
 
             assert app.project_root == project_root
             assert app.config is not None
-            assert app.state.phase == Phase.INIT
+            assert app.workflow is not None
+            assert app.workflow.state.phase == Phase.INIT
 
     def test_app_with_custom_config(self):
         """Test app with custom config."""
@@ -28,6 +32,7 @@ class TestAgentCollabApp:
             project_root = Path(tmpdir)
             config = Config()
             config.workflow.max_iterations = 10
+            config.get_workdir(project_root).mkdir(parents=True, exist_ok=True)
 
             app = AgentCollabApp(project_root=project_root, config=config)
 
@@ -47,38 +52,32 @@ class TestAgentCollabApp:
 
             app = AgentCollabApp(project_root=project_root, config=config)
 
-            assert app.state.phase == Phase.REVIEW
-            assert app.state.iteration == 3
+            assert app.workflow.state.phase == Phase.REVIEW
+            assert app.workflow.state.iteration == 3
 
     def test_app_bindings(self):
         """Test app has expected key bindings."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            app = AgentCollabApp(project_root=Path(tmpdir))
+            project_root = Path(tmpdir)
+            (project_root / ".agent-collab").mkdir()
+
+            app = AgentCollabApp(project_root=project_root)
 
             binding_keys = [b.key for b in app.BINDINGS]
             assert "q" in binding_keys
-            assert "enter" in binding_keys
             assert "r" in binding_keys
 
 
-class TestAppMethods:
-    """Tests for app methods."""
+class TestAppWorkflow:
+    """Tests for app workflow integration."""
 
-    def test_set_phase(self):
-        """Test setting phase updates state."""
+    def test_workflow_controller_created(self):
+        """Test workflow controller is created on init."""
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
-            config = Config()
-            workdir = config.get_workdir(project_root)
-            workdir.mkdir(parents=True, exist_ok=True)
+            (project_root / ".agent-collab").mkdir()
 
-            app = AgentCollabApp(project_root=project_root, config=config)
-            app.set_phase(Phase.REFINE_GOAL)
+            app = AgentCollabApp(project_root=project_root)
 
-            assert app.state.phase == Phase.REFINE_GOAL
-
-            # Check state was persisted
-            from agent_collab.persistence import load_state
-            loaded = load_state(config.get_state_path(project_root))
-            assert loaded is not None
-            assert loaded.phase == Phase.REFINE_GOAL
+            assert app.workflow is not None
+            assert app.workflow.project_root == project_root

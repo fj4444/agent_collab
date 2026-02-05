@@ -144,3 +144,23 @@
 - `tests/test_workflow.py`：新建，10 个工作流测试
 
 **测试结果**：10/10 通过（总计 66/66）
+
+---
+
+## Step 3.2：TUI 与工作流集成
+
+**日期**：2026-02-05
+
+**完成内容**：
+- 重构 TUI 应用集成 WorkflowController
+- 添加用户输入框（Input widget）
+- 实现命令处理：`/plan`（写计划）、`/approve`（强制批准）、`/execute`（执行）
+- 实现用户消息处理，与 Planner agent 对话
+- 添加欢迎消息和会话恢复提示
+- 更新状态栏显示迭代次数
+
+**主要文件变更**：
+- `src/agent_collab/tui/app.py`：重构，集成 WorkflowController，添加用户输入处理
+- `tests/test_tui.py`：更新，适配新的 TUI 结构
+
+**测试结果**：66/66 通过
