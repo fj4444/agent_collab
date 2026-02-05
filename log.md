@@ -123,3 +123,24 @@
 - `tests/test_init.py`：更新，适配新的 main 结构
 
 **测试结果**：7/7 通过
+
+---
+
+## Step 3.1：工作流控制器
+
+**日期**：2026-02-05
+
+**完成内容**：
+- 创建 `WorkflowController` 类，协调整个工作流
+- 实现 `start_refinement()`、`write_plan()`、`review_plan()`、`respond_to_comments()`、`execute_step()` 方法
+- 实现 `is_approved()` 检测审阅是否通过
+- 实现 `is_max_iterations()` 检测迭代上限
+- 实现 `recover_context()` 恢复会话上下文
+- 支持输出回调和阶段变更回调
+
+**主要文件变更**：
+- `src/agent_collab/engine/workflow.py`：新建，WorkflowController 类
+- `src/agent_collab/engine/__init__.py`：更新，导出 WorkflowController
+- `tests/test_workflow.py`：新建，10 个工作流测试
+
+**测试结果**：10/10 通过（总计 66/66）
