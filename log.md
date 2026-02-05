@@ -59,3 +59,26 @@
 - `tests/test_adapters.py`：新建，适配器测试
 
 **测试结果**：12/12 通过
+
+---
+
+## Step 1.4：状态机 + 持久化
+
+**日期**：2026-02-05
+
+**完成内容**：
+- 创建 `Phase` 枚举，定义工作流所有阶段
+- 定义状态转换规则 `TRANSITIONS`，实现 `can_transition()` 和 `get_next_phases()`
+- 创建 `WorkflowState` 数据类，支持 to_dict/from_dict 序列化
+- 实现 `save_state()`：原子写入（先写临时文件再 rename）
+- 实现 `load_state()`、`delete_state()`、`state_exists()`
+
+**主要文件变更**：
+- `src/agent_collab/engine/state_machine.py`：新建，Phase 枚举和状态转换
+- `src/agent_collab/engine/__init__.py`：更新，导出状态机组件
+- `src/agent_collab/persistence/state.py`：新建，WorkflowState 和持久化函数
+- `src/agent_collab/persistence/__init__.py`：更新，导出持久化组件
+- `tests/test_state_machine.py`：新建，11 个状态机测试
+- `tests/test_persistence.py`：新建，9 个持久化测试
+
+**测试结果**：20/20 通过
