@@ -1,20 +1,13 @@
 """Tests for project initialization."""
-import subprocess
-import sys
-
-
-def test_cli_entry_point():
-    """Test that CLI entry point works."""
-    result = subprocess.run(
-        [sys.executable, "-m", "agent_collab.main"],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0
-    assert "agent-collab" in result.stdout
+from agent_collab import main as main_module
+from agent_collab.tui import AgentCollabApp
 
 
 def test_import_main_module():
     """Test that main module can be imported."""
-    from agent_collab import main
-    assert hasattr(main, "main")
+    assert hasattr(main_module, "main")
+
+
+def test_import_tui_app():
+    """Test that TUI app can be imported."""
+    assert AgentCollabApp is not None

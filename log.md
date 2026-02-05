@@ -101,3 +101,25 @@
 - `tests/test_prompt_loader.py`：新建，11 个 prompt 加载测试
 
 **测试结果**：11/11 通过
+
+---
+
+## Step 2.1：TUI 基础框架
+
+**日期**：2026-02-05
+
+**完成内容**：
+- 创建 `AgentCollabApp` 主应用类，基于 Textual
+- 实现 3 个 Tab：ConversationTab、PlanTab、CommentsTab
+- 实现 StatusBar 显示当前工作流阶段
+- 添加快捷键：`q` 退出、`Enter` 继续、`r` 刷新
+- 更新 `main.py` 启动 TUI 应用
+
+**主要文件变更**：
+- `src/agent_collab/tui/app.py`：新建，TUI 主应用和组件
+- `src/agent_collab/tui/__init__.py`：更新，导出 AgentCollabApp
+- `src/agent_collab/main.py`：更新，启动 TUI 应用
+- `tests/test_tui.py`：新建，5 个 TUI 测试
+- `tests/test_init.py`：更新，适配新的 main 结构
+
+**测试结果**：7/7 通过
