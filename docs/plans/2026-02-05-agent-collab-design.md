@@ -19,7 +19,7 @@
     Planner 响应 ──► 更新 plan.md 或回复 comments.md
          │
          ▼
-    [循环直到达成一致或达到迭代上限]
+    [循环直到 [APPROVED] 或达到迭代上限]
          │
          ▼
     用户批准 ──► Planner 逐步执行
@@ -49,27 +49,186 @@
 ### 4. 交互审批模式
 - **手动模式（默认）**：每轮 agent 交互需用户审阅放行
 - **自动模式**：agent 自动轮次交互，直到达成一致
+- **控制机制**：
+  - `[P]` 暂停自动模式，切回手动
+  - `[S]` 停止当前阶段，回到目标细化
+  - `[Ctrl+C]` 安全退出，保存状态
 
-### 5. 达成一致的判定（混合策略）
-1. Reviewer 在 comments.md 中写入 `[APPROVED]` 标记
-2. comments.md 为空或仅含同意性语句
-3. 迭代达到上限（默认 5 轮）→ 请求用户裁决
+### 5. 达成一致的判定
+
+**结构化标记规范**（写在 comments.md 首行）：
+- `[APPROVED]` — 审阅通过，可进入执行阶段
+- `[CHANGES_REQUIRED]` — 需要修改，继续迭代
+- 无标记或其他内容 — 视为 `[CHANGES_REQUIRED]`
+
+**迭代上限**：默认 5 轮，达到后弹出用户裁决对话框：
+- 选项：强制通过 / 继续迭代 N 轮 / 手动介入编辑 / 取消任务
 
 ### 6. 持久化策略
 - **优先完全持久化**：保存 state.json（阶段、session ID、迭代轮次）
-- **降级机制**：session 恢复失败时，让 agent 重新读取 plan/comments 获取上下文
+- **降级机制**：session 恢复失败时，通过 prompt 注入 plan/comments 内容
+- **原子写入**：先写 `.tmp` 文件再 rename，防止写入中断导致损坏
 
 ### 7. TUI 布局
 - **主要 Tab**：对话、Plan、Comments
 - **收起 Tab**：Log、Status（按需展开）
+- **刷新机制**：文件监控（watchfiles）+ 状态变更事件驱动
 
 ### 8. Prompt 管理
 - `prompts/` 目录，每阶段一个 `.md` 模板文件
 - 支持变量替换（如 `{{plan_content}}`）
 
 ### 9. 测试执行
-- 由 Planner agent 自主决定测试方式
-- 若 agent 需要确认，允许向用户发问
+- **默认策略**：若项目根目录有 `pytest.ini`/`pyproject.toml` 则用 pytest，有 `package.json` 则用 npm test
+- **Agent 可覆盖**：Planner 可自主决定其他测试方式
+- **用户确认**：Agent 需要确认时，问题路由给用户
+
+### 10. 执行阶段安全策略
+
+**默认禁止的命令**（可在 config.toml 中调整）：
+- `rm -rf`、`sudo`、`chmod 777`、`> /dev/sda` 等破坏性命令
+- 检测到时暂停执行，请求用户确认
+
+**Git commit 规则**：
+- 无变更时跳过 commit
+- Commit message 格式：`[Step N] <简述变更>`
+- Commit 失败时记录错误，询问用户是否继续
+
+## 目录与文件约定
+
+所有工作流文件位于项目根目录的 `.agent-collab/` 下：
+
+```
+<project-root>/
+├── .agent-collab/
+│   ├── state.json        # 工作流状态
+│   ├── plan.md           # 当前计划
+│   ├── comments.md       # 审阅意见
+│   ├── log.md            # 执行日志（增量）
+│   ├── debug.log         # 调试日志（轮转，最大 10MB）
+│   └── history/          # 历史存档（可选）
+│       └── 2026-02-05-task-name/
+└── ...
+```
+
+**并发编辑处理**：
+- Agent 写入前获取文件锁（`fcntl.flock`）
+- 检测到外部修改时提示用户：覆盖 / 合并 / 放弃
+
+## 文件格式规范
+
+### plan.md
+```markdown
+---
+version: 1
+status: draft | reviewing | approved
+iteration: 2
+author: planner
+updated: 2026-02-05T10:30:00Z
+---
+
+# 任务：<标题>
+
+## 目标
+...
+
+## 步骤
+1. [ ] 步骤一
+2. [ ] 步骤二
+...
+```
+
+### comments.md
+```markdown
+---
+status: APPROVED | CHANGES_REQUIRED
+iteration: 2
+author: reviewer
+updated: 2026-02-05T10:35:00Z
+---
+
+[APPROVED]
+
+或
+
+[CHANGES_REQUIRED]
+
+## 意见
+1. ...
+2. ...
+```
+
+## CLI 适配器兼容规范
+
+### 最小接口要求
+| 能力 | Codex | Claude Code |
+|-----|-------|-------------|
+| 启动命令 | `codex` | `claude` |
+| 指定工作目录 | `--cwd <path>` | 在目录下运行 |
+| Session 恢复 | `--session <id>` | `--resume` |
+| 非交互输入 | stdin pipe | `--print` + stdin |
+| 输出格式 | 流式文本 | 流式文本 |
+
+### 输出解析
+- 不做强格式假设
+- 保留原始输出到 debug.log
+- 提问检测：启发式（`?` 结尾、"请问"/"是否"/"which"/"should" 等）
+
+## 状态机定义
+
+```
+        ┌─────────────────────────────────────────┐
+        │                                         │
+        ▼                                         │
+     [INIT] ──► [REFINE_GOAL] ──► [WRITE_PLAN]   │
+                     ▲                  │         │
+                     │                  ▼         │
+                     │            [REVIEW] ◄──────┤
+                     │                  │         │
+                     │                  ▼         │
+                     │            [RESPOND] ──────┘
+                     │                  │
+                     │         (达成一致)│
+                     │                  ▼
+                     │            [APPROVED] ──► [EXECUTE] ──► [DONE]
+                     │                  │              │
+                     │                  │              │
+                     └──────────────────┴──────────────┘
+                            (用户取消/回退)
+
+     额外状态：[CANCELLED] — 用户主动取消，清理资源
+```
+
+## 恢复流程
+
+### 正常恢复（完全持久化）
+1. 读取 `state.json`
+2. 尝试用 session ID 恢复 agent 会话
+3. 成功 → 继续上次中断的操作
+
+### 降级恢复（session 失效）
+1. Session 恢复失败
+2. 读取 plan.md 和 comments.md 内容
+3. 构造恢复 prompt：
+   ```
+   [系统] 这是之前的工作上下文，请继续。
+
+   === plan.md ===
+   {{plan_content}}
+
+   === comments.md ===
+   {{comments_content}}
+
+   当前阶段：{{phase}}
+   请从这里继续。
+   ```
+4. 以新 session 继续
+
+### 异常退出恢复
+1. 启动时检测 `state.json` 存在且 phase ≠ DONE
+2. 提示用户："检测到未完成的会话，是否继续？[Y/n]"
+3. 选择继续 → 执行恢复流程
+4. 选择放弃 → 归档到 history/，重新开始
 
 ## 核心模块划分
 
@@ -79,180 +238,131 @@ agent-collab/
 │   ├── main.py              # 入口
 │   ├── tui/                  # TUI 界面层
 │   │   ├── app.py           # Textual App
-│   │   └── tabs/            # 各 Tab 组件
+│   │   ├── tabs/            # 各 Tab 组件
+│   │   └── dialogs.py       # 确认/裁决对话框
 │   ├── engine/              # 工作流引擎
 │   │   ├── state_machine.py # 状态机
 │   │   ├── approval.py      # 审批控制器
+│   │   ├── safety.py        # 安全检查
 │   │   └── prompt_loader.py # 模板加载
 │   ├── adapters/            # Agent 适配层
 │   │   ├── base.py          # 抽象基类
 │   │   ├── codex.py         # Codex 适配器
 │   │   └── claude.py        # Claude Code 适配器
 │   └── persistence/         # 持久化
-│       └── state.py         # 状态存取
+│       ├── state.py         # 状态存取
+│       └── file_lock.py     # 文件锁
 ├── prompts/                  # Prompt 模板
 │   ├── 01_refine_goal.md
 │   ├── 02_write_plan.md
 │   ├── 03_review_plan.md
 │   ├── 04_respond_comments.md
-│   └── 05_execute_step.md
+│   ├── 05_execute_step.md
+│   └── 06_recover_context.md
 ├── config.toml               # 用户配置
-└── docs/
-    └── plans/
+└── docs/plans/
 ```
 
-## 实现计划
+## 配置文件
 
-### Phase 1：核心骨架（最小可用）
-
-**目标**：能跑通一次完整的 plan → review → approve → execute 流程
-
-**Step 1.1：Agent 适配器**
-```python
-# adapters/base.py
-class AgentAdapter(ABC):
-    @abstractmethod
-    async def send(self, prompt: str) -> AsyncIterator[str]: ...
-    @abstractmethod
-    async def resume_session(self, session_id: str) -> bool: ...
-    @abstractmethod
-    def get_session_id(self) -> str: ...
-```
-
-- 实现 `CodexAdapter` 和 `ClaudeAdapter`
-- 使用 `asyncio.subprocess` 调用 CLI
-- 解析输出流，检测是否包含用户提问
-
-**Corner cases**:
-- CLI 不存在或未登录 → 启动时检查，给出明确错误
-- Session 恢复失败 → 返回 False，由上层降级处理
-- 输出解析异常 → 记录原始输出到 debug log
-
-**Step 1.2：状态机**
-```python
-# engine/state_machine.py
-class Phase(Enum):
-    INIT = "init"
-    REFINE_GOAL = "refine_goal"
-    WRITE_PLAN = "write_plan"
-    REVIEW = "review"
-    RESPOND = "respond"
-    APPROVED = "approved"
-    EXECUTE = "execute"
-    DONE = "done"
-```
-
-- 定义状态转换规则
-- 每次转换持久化到 state.json
-
-**Step 1.3：持久化**
-```python
-# persistence/state.py
-@dataclass
-class WorkflowState:
-    phase: Phase
-    iteration: int
-    planner_session: str | None
-    reviewer_session: str | None
-    auto_approve: bool
-```
-
-- 使用 `dataclasses` + JSON 序列化
-- 原子写入（先写临时文件再 rename）
-
-**Step 1.4：Prompt 加载器**
-- 读取 `prompts/*.md`
-- 简单的 `{{variable}}` 替换
-
-### Phase 2：TUI 界面
-
-**Step 2.1：基础框架**
-- Textual App + TabbedContent
-- 三个主 Tab：Conversation、Plan、Comments
-
-**Step 2.2：实时输出**
-- Agent 输出流式显示在 Conversation Tab
-- Plan/Comments Tab 显示文件内容，文件变化时刷新
-
-**Step 2.3：交互控制**
-- 底部状态栏显示当前阶段
-- 快捷键：`[Enter]` 放行、`[A]` 切换自动模式、`[Q]` 退出
-
-**Corner cases**:
-- 终端尺寸过小 → 显示最小尺寸提示
-- 长输出 → 自动滚动，保留滚动历史
-
-### Phase 3：完整工作流
-
-**Step 3.1：目标细化阶段**
-- 用户与 Planner 对话
-- 用户输入 `/plan` 命令进入写 plan 阶段
-
-**Step 3.2：Plan-Review 循环**
-- Planner 写 plan.md
-- Reviewer 读 plan，写 comments.md
-- 检测一致性标记或迭代次数
-- 手动模式下每轮等待用户 `[Enter]`
-
-**Step 3.3：执行阶段**
-- 逐步执行 plan 中的步骤
-- 每步完成后：运行测试 → git commit → 更新 log.md
-
-**Corner cases**:
-- Plan 格式不规范 → 让 Planner 自行解析，不做强假设
-- 测试失败 → 显示失败信息，让 Planner 决定是否修复
-- Git 操作失败 → 记录错误，询问用户是否继续
-
-### Phase 4：健壮性 & 体验优化
-
-**Step 4.1：Session 恢复降级**
-- 完全恢复失败时，构造包含 plan/comments 内容的 prompt
-- 告知 agent "这是之前的上下文，请继续"
-
-**Step 4.2：Agent 提问检测**
-- 简单启发式：输出以 `?` 结尾或包含 "请问"/"是否" 等关键词
-- 检测到时路由给用户回答
-
-**Step 4.3：配置文件**
 ```toml
 # config.toml
+
 [roles]
-planner = "codex"  # or "claude"
+planner = "codex"      # "codex" | "claude" | 自定义适配器
 reviewer = "claude"
 
 [workflow]
 max_iterations = 5
 auto_approve = false
+confirm_enter = false  # Enter 放行是否需要二次确认
+
+[safety]
+blocked_commands = ["rm -rf", "sudo", "chmod 777", "> /dev/"]
+require_confirm_for = ["git push", "npm publish"]
 
 [paths]
+workdir = ".agent-collab"
 plan = "plan.md"
 comments = "comments.md"
 log = "log.md"
+debug_log = "debug.log"
+debug_log_max_size = "10MB"
+
+[test]
+default_command = "auto"  # "auto" | "pytest" | "npm test" | 自定义
+fallback_to_agent = true  # 检测失败时让 agent 决定
 ```
+
+## 实现计划
+
+### Phase 1：核心骨架
+
+**Step 1.1：项目初始化**
+- pyproject.toml + 依赖（textual, watchfiles, tomli）
+- 目录结构
+
+**Step 1.2：Agent 适配器**
+- 抽象基类 + Codex/Claude 实现
+- Session 管理、输出流解析
+
+**Step 1.3：状态机 + 持久化**
+- Phase enum + 转换规则
+- state.json 读写 + 原子写入
+
+**Step 1.4：Prompt 加载器**
+- 模板读取 + 变量替换
+
+### Phase 2：TUI 界面
+
+**Step 2.1：基础框架**
+- Textual App + TabbedContent
+- 文件监控刷新
+
+**Step 2.2：交互控制**
+- 快捷键绑定
+- 状态栏
+
+**Step 2.3：对话框**
+- 用户裁决对话框
+- 确认对话框
+
+### Phase 3：完整工作流
+
+**Step 3.1：目标细化 → 写 Plan**
+**Step 3.2：Plan-Review 循环**
+**Step 3.3：执行阶段 + 测试 + Git**
+
+### Phase 4：健壮性
+
+**Step 4.1：恢复流程（完全 + 降级）**
+**Step 4.2：安全检查**
+**Step 4.3：日志轮转**
 
 ## 代码量估算
 
-| 模块 | 估算行数 | 说明 |
-|-----|---------|------|
-| adapters/ | ~200 | 两个适配器 + 基类 |
-| engine/ | ~150 | 状态机 + 审批 + prompt 加载 |
-| persistence/ | ~80 | 状态存取 |
-| tui/ | ~300 | Textual 界面 |
-| prompts/ | ~100 | 5 个模板文件 |
-| **总计** | **~830** | 不含测试 |
+| 模块 | 估算行数 |
+|-----|---------|
+| adapters/ | ~250 |
+| engine/ | ~200 |
+| persistence/ | ~100 |
+| tui/ | ~350 |
+| prompts/ | ~120 |
+| **总计** | **~1020** |
 
 ## 风险与缓解
 
 | 风险 | 缓解措施 |
 |-----|---------|
-| CLI 输出格式变化导致解析失败 | 适配器做好容错，保留原始输出 |
-| Agent 产出不符合预期格式 | 不做强假设，让 agent 自行处理 |
-| Session 恢复不可靠 | 实现降级机制，重新喂上下文 |
-| 长时间运行内存泄漏 | TUI 组件及时清理，限制历史长度 |
+| CLI 输出格式变化 | 容错解析 + 保留原始输出 |
+| Session 恢复不可靠 | 降级机制 |
+| 并发编辑冲突 | 文件锁 + 提示 |
+| 长时间运行内存泄漏 | 限制历史长度 + 日志轮转 |
+| 破坏性命令执行 | 黑名单 + 确认机制 |
 
 ## 下一步
 
-1. 初始化项目结构和依赖（`pyproject.toml`）
+1. 初始化项目结构和依赖
 2. 实现 Phase 1 核心骨架
 3. 编写基础测试
 4. 迭代完善
