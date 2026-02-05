@@ -37,3 +37,25 @@
 - `tests/test_config.py`：新建，配置加载测试
 
 **测试结果**：6/6 通过
+
+---
+
+## Step 1.3：Agent 适配器
+
+**日期**：2026-02-05
+
+**完成内容**：
+- 创建 `AgentAdapter` 抽象基类，定义 send/resume_session/check_available 等接口
+- 实现 `CodexAdapter`：调用 codex CLI，支持 --cwd 和 --session 参数
+- 实现 `ClaudeAdapter`：调用 claude CLI，支持 --print 和 --resume 参数
+- 创建 `create_adapter()` 工厂函数，根据类型创建适配器
+
+**主要文件变更**：
+- `src/agent_collab/adapters/base.py`：新建，AgentAdapter 抽象基类
+- `src/agent_collab/adapters/codex.py`：新建，Codex CLI 适配器
+- `src/agent_collab/adapters/claude.py`：新建，Claude CLI 适配器
+- `src/agent_collab/adapters/factory.py`：新建，适配器工厂
+- `src/agent_collab/adapters/__init__.py`：更新，导出所有适配器
+- `tests/test_adapters.py`：新建，适配器测试
+
+**测试结果**：12/12 通过
