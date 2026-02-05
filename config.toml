@@ -1,0 +1,14 @@
+# Agent Collab Configuration
+
+[roles]
+planner = "codex"      # "codex" | "claude"
+reviewer = "claude"
+
+[workflow]
+max_iterations = 5
+
+[paths]
+workdir = ".agent-collab"
+plan = "plan.md"
+comments = "comments.md"
+log = "log.md"
