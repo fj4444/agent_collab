@@ -82,3 +82,22 @@
 - `tests/test_persistence.py`：新建，9 个持久化测试
 
 **测试结果**：20/20 通过
+
+---
+
+## Step 1.5：Prompt 加载器
+
+**日期**：2026-02-05
+
+**完成内容**：
+- 创建 `prompt_loader.py`，实现 `load_prompt()`、`substitute_variables()`、`list_prompts()`
+- 变量替换使用 `{{variable}}` 语法
+- 创建 6 个 prompt 模板文件（refine_goal, write_plan, review_plan, respond_comments, execute_step, recover_context）
+
+**主要文件变更**：
+- `src/agent_collab/engine/prompt_loader.py`：新建，模板加载和变量替换
+- `src/agent_collab/engine/__init__.py`：更新，导出 prompt_loader 函数
+- `prompts/01_refine_goal.md` - `prompts/06_recover_context.md`：新建，6 个 prompt 模板
+- `tests/test_prompt_loader.py`：新建，11 个 prompt 加载测试
+
+**测试结果**：11/11 通过
