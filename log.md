@@ -164,3 +164,51 @@
 - `tests/test_tui.py`：更新，适配新的 TUI 结构
 
 **测试结果**：66/66 通过
+
+---
+
+## MVP 完成总结
+
+**日期**：2026-02-05
+
+**已完成的 MVP 功能**：
+- ✅ 配置加载（config.toml）
+- ✅ Agent 适配器（Codex、Claude）
+- ✅ 状态机 + 持久化（完全持久化 + 降级恢复）
+- ✅ Prompt 模板加载
+- ✅ TUI 界面（3 Tab：对话、Plan、Comments）
+- ✅ 工作流控制器
+- ✅ 用户输入处理（/plan、/approve、/execute 命令）
+
+**代码统计**：
+- 源代码：~1123 行
+- 测试代码：~721 行
+- 测试用例：66 个（全部通过）
+
+**项目结构**：
+```
+agent-collab/
+├── src/agent_collab/
+│   ├── adapters/     # Agent CLI 适配器
+│   ├── engine/       # 状态机、工作流、Prompt 加载
+│   ├── persistence/  # 状态持久化
+│   ├── tui/          # TUI 界面
+│   ├── config.py     # 配置加载
+│   └── main.py       # 入口
+├── tests/            # 测试
+├── prompts/          # Prompt 模板
+├── config.toml       # 默认配置
+└── pyproject.toml    # 项目配置
+```
+
+**使用方式**：
+```bash
+cd <project-directory>
+agent-collab
+```
+
+**MVP 暂不支持**：
+- 自动模式（agent 自动轮次交互）
+- 安全策略（危险命令检测）
+- 文件锁 / 并发编辑处理
+- 日志轮转
