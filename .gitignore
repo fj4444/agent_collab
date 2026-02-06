@@ -38,3 +38,6 @@ htmlcov/
 
 # Project specific
 .agent-collab/
+
+# Apple directory 
+*.DS_Store
